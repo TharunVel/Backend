@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Anonymous Feedback SPA</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #31326F, #4FB7B3);
+      margin: 0;
+      padding: 40px;
+      color: #333;
+    }
+    .container {
+      max-width: 900px;
+      margin: auto;
+      background: #fff;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      background: linear-gradient(90deg, #31326F, #4FB7B3);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    nav {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 25px;
+    }
+    nav button {
+      padding: 12px 25px;
+      margin: 0 8px;
+      border: none;
+      border-radius: 8px;
+      background: #eee;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.3s;
+    }
+    nav button.active {
+      background: linear-gradient(90deg, #4FB7B3, #31326F);
+      color: #fff;
+    }
+    nav button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .tab {
+      display: none;
+    }
+    .tab.active {
+      display: block;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      padding: 20px;
+      background: #f9f9f9;
+      border-radius: 12px;
+      border: 1px solid #eee;
+    }
+    select, textarea, input, button {
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 15px;
+    }
+    textarea { min-height: 80px; resize: vertical; }
+    form button {
+      background: linear-gradient(90deg, #4FB7B3, #31326F);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    form button:hover {
+      transform: translateY(-2px);
+    }
+    .filters {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .feedback-entry {
+      background: #fafafa;
+      border-radius: 10px;
+      padding: 15px 20px;
+      margin-bottom: 15px;
+      border: 1px solid #eee;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .rating { font-weight: bold; color: #4FB7B3; }
+    .comment { margin: 8px 0; color: #444; }
+    .timestamp { font-size: 0.85rem; color: #777; }
+    .tag {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 5px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      color: white;
+      margin-left: 5px;
+    }
+    .tag.positive { background: #27ae60; }
+    .tag.neutral { background: #f39c12; }
+    .tag.negative { background: #e74c3c; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Anonymous Feedback</h1>
+
+    <nav>
+      <button id="tab-submit" class="active">Submit Feedback</button>
+      <button id="tab-dashboard">Dashboard</button>
+    </nav>
+    <div id="submit-tab" class="tab active">
+      <form id="feedbackForm">
+        <label>Rating:
+          <select id="rating" required>
+            <option value="">Select</option>
+            <option value="1">1 - Poor</option>
+            <option value="2">2 - Bad</option>
+            <option value="3">3 - Average</option>
+            <option value="4">4 - Good</option>
+            <option value="5">5 - Excellent</option>
+          </select>
+        </label>
+        <textarea id="comment" placeholder="Enter your feedback..."></textarea>
+        <button type="submit">Submit Feedback</button>
+      </form>
+    </div>
+    <div id="dashboard-tab" class="tab">
+      <div class="filters">
+        <input type="text" id="keywordFilter" placeholder="Search keyword...">
+        <select id="sentimentFilter">
+          <option value="">All Sentiments</option>
+          <option value="positive">Positive</option>
+          <option value="neutral">Neutral</option>
+          <option value="negative">Negative</option>
+        </select>
+      </div>
+      <div id="feedbackList"></div>
+    </div>
+  </div>
+  <script>
+    const API_URL = "http://localhost:5000/api/feedback";
+    const form = document.getElementById("feedbackForm");
+    const list = document.getElementById("feedbackList");
+    const keywordInput = document.getElementById("keywordFilter");
+    const sentimentInput = document.getElementById("sentimentFilter");
+    let feedbackData = [];
+    const tabs = {
+      submit: document.getElementById("submit-tab"),
+      dashboard: document.getElementById("dashboard-tab"),
+    };
+    document.getElementById("tab-submit").addEventListener("click", () => switchTab("submit"));
+    document.getElementById("tab-dashboard").addEventListener("click", () => {
+      switchTab("dashboard");
+      loadFeedback();
+    });
+    function switchTab(tab) {
+      document.querySelectorAll("nav button").forEach(btn => btn.classList.remove("active"));
+      document.querySelectorAll(".tab").forEach(tabEl => tabEl.classList.remove("active"));
+      if (tab === "submit") {
+        document.getElementById("tab-submit").classList.add("active");
+        tabs.submit.classList.add("active");
+      } else {
+        document.getElementById("tab-dashboard").classList.add("active");
+        tabs.dashboard.classList.add("active");
+      }
+    }
+    function getSentiment(rating) {
+      if (rating >= 4) return "positive";
+      if (rating === 3) return "neutral";
+      return "negative";
+    }
+    async function loadFeedback() {
+      try {
+        const res = await fetch(API_URL);
+        feedbackData = await res.json();
+        renderFeedback();
+      } catch (err) {
+        console.error("Error loading feedback:", err);
+      }
+    }
+    function renderFeedback() {
+      list.innerHTML = "";
+      const keyword = keywordInput.value.toLowerCase();
+      const sentiment = sentimentInput.value;
+      feedbackData
+        .filter(fb => {
+          const fbSentiment = getSentiment(fb.rating);
+          const matchesSentiment = sentiment ? fbSentiment === sentiment : true;
+          const matchesKeyword = keyword ? (fb.comment || "").toLowerCase().includes(keyword) : true;
+          return matchesSentiment && matchesKeyword;
+        })
+        .forEach(fb => {
+          const div = document.createElement("div");
+          const sentimentTag = getSentiment(fb.rating);
+          div.className = "feedback-entry";
+          div.innerHTML = `
+            <div class="rating">
+              ⭐ Rating: ${fb.rating}
+              <span class="tag ${sentimentTag}">${sentimentTag}</span>
+            </div>
+            <div class="comment">${fb.comment || "No comment"}</div>
+            <div class="timestamp">${new Date(fb.timestamp).toLocaleString()}</div>
+          `;
+          list.appendChild(div);
+        });
+    }
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const rating = parseInt(document.getElementById("rating").value, 10);
+      const comment = document.getElementById("comment").value;
+      if (!rating) {
+        alert("Please select a rating");
+        return;
+      }
+      try {
+        await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rating, comment })
+        });
+        form.reset();
+        alert("Feedback submitted successfully!");
+      } catch (err) {
+        console.error("Error submitting feedback:", err);
+      }
+    });
+    keywordInput.addEventListener("input", renderFeedback);
+    sentimentInput.addEventListener("change", renderFeedback);
+  </script>
+</body>
+</html>
